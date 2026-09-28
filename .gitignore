@@ -4,3 +4,5 @@ __pycache__/
 *.bz2pickle
 *.sf2
 .ipynb_checkpoints/
+input_groove.wav
+model_output.wav
