@@ -42,3 +42,29 @@ if __name__ == "__main__":
     # model_mute_genre2 = load_model("path/to/mute_latent_genre_input_vae_beta_0_2.pth", MuteLatentGenreInputVAE)
 
     print("Model loaded successfully.")
+
+    groove_hits = torch.tensor([1, 0, 0, 0] * 8, dtype=torch.float).view(1, 32, 1).float()
+    groove_velocities = torch.rand((1, 32, 1)) * groove_hits        # values between 0 and 1 at hits == 1
+    groove_offsets = (torch.rand((1, 32, 1)) - 0.5) * groove_hits   # values between -0.5 and 0.5 at hits == 1
+    input_groove = torch.cat([groove_hits, groove_velocities, groove_offsets], dim=-1)
+
+    
+
+    # simple prediction
+    hvo, latent_z = model_base.predict(input_groove)
+    # hvo, latent_z = model_mute.predict(input_groove, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+    # hvo, latent_z = model_mute_genre1.predict(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+    # hvo, latent_z = model_mute_genre2.predict(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+
+
+
+    # # forward pass 
+    # h_logits, v_logits, o_logits, mu, log_var, latent_z = model_base.forward(input_groove)
+    # # h_logits, v_logits, o_logits, mu, log_var, latent_z = model_mute.forward(input_groove, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+    # # h_logits, v_logits, o_logits, mu, log_var, latent_z = model_mute_genre1.forward(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+    # # h_logits, v_logits, o_logits, mu, log_var, latent_z = model_mute_genre2.forward(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
+    
+    # # activate outputs
+    # hits = torch.sigmoid(h_logits)
+    # velocities = torch.tanh(v_logits) + 0.5     # Make sure you use 0.5
+    # offsets = torch.tanh(o_logits)
