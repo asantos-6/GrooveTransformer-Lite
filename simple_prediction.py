@@ -31,7 +31,7 @@ def load_model(model_path, model_class, params_dict=None, is_evaluating=True, de
 
 if __name__ == "__main__":
     beta = 0.2  # Replace with the appropriate beta value for your model
-    model_path = f"base_vae_beta_{beta}.pth"
+    model_path = f"base_vae_beta_{str(beta).replace('.', '_')}.pth"
     model_class = BaseVAE  # Replace with the appropriate model class
     params_dict = None  # Replace with your parameters dictionary or JSON path if needed
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # hvo, latent_z = model_mute.predict(input_groove, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
     # hvo, latent_z = model_mute_genre1.predict(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
     # hvo, latent_z = model_mute_genre2.predict(input_groove, genre_ix, kick_is_muted, snare_is_muted, hat_is_muted, tom_is_muted, cymbal_is_muted)
-
+    print("Prediction completed successfully.")
 
 
     # # forward pass 
