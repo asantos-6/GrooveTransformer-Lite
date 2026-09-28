@@ -6,3 +6,4 @@ __pycache__/
 .ipynb_checkpoints/
 input_groove.wav
 model_output.wav
+gmd_original_segment.wav
