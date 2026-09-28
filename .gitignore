@@ -7,3 +7,6 @@ __pycache__/
 input_groove.wav
 model_output.wav
 gmd_original_segment.wav
+artifacts/tap2drum-groovetransformer_lite-gradio/detected_taps.wav
+artifacts/tap2drum-groovetransformer_lite-gradio/groove_transformer_output.wav
+artifacts/tap2drum-groovetransformer_lite-gradio/recording_plus_output.wav
