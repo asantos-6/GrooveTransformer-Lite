@@ -31,6 +31,7 @@ DEFAULT_BPM = 120
 DEFAULT_THRESHOLD = 0.25
 DEFAULT_MIN_TAP_GAP_MS = 70
 DEFAULT_OUTPUT_THRESHOLD = 0.5
+TIMING_MODES = ["Use BPM slider", "Fit 2 bars to detected taps"]
 
 DRUM_NAMES = [
     "kick",
@@ -148,6 +149,26 @@ def detect_taps(
     strengths = np.asarray(props["peak_heights"], dtype=np.float32)
     strengths = strengths / (float(np.max(strengths)) + 1e-8)
     return peaks.astype(np.int64), strengths
+
+
+def estimate_bpm_from_taps(
+    tap_samples: np.ndarray,
+    sr: int,
+    fallback_bpm: float,
+    min_bpm: float = 60.0,
+    max_bpm: float = 200.0,
+) -> float:
+    if len(tap_samples) < 2:
+        return float(fallback_bpm)
+
+    tap_times = tap_samples.astype(np.float32) / float(sr)
+    gaps = np.diff(tap_times)
+    active_gaps = gaps[gaps > 0.03]
+    tail = float(np.median(active_gaps)) if active_gaps.size else 0.0
+    two_bar_duration = float(tap_times[-1] - tap_times[0] + tail)
+    if two_bar_duration <= 0:
+        return float(fallback_bpm)
+    return float(np.clip(60.0 * 8.0 / two_bar_duration, min_bpm, max_bpm))
 
 
 def taps_to_model_input(
@@ -292,10 +313,24 @@ def mix_audio(original: np.ndarray, generated: np.ndarray, generated_gain: float
     return stereo
 
 
+def align_audio_to_recording(
+    rendered: np.ndarray,
+    original_length: int,
+    start_time_sec: float,
+    sr: int,
+) -> np.ndarray:
+    start = max(0, int(round(float(start_time_sec) * sr)))
+    length = max(original_length, start + len(rendered))
+    aligned = np.zeros(length, dtype=np.float32)
+    aligned[start : start + len(rendered)] = rendered
+    return aligned
+
+
 def process_audio(
     audio_path: str | None,
     model_path: str,
     bpm: float,
+    timing_mode: str,
     tap_threshold: float,
     min_tap_gap_ms: float,
     output_threshold: float,
@@ -310,6 +345,9 @@ def process_audio(
 
     original_audio, sr = read_audio(Path(audio_path), target_sr=SR)
     tap_samples, tap_strengths = detect_taps(original_audio, sr, tap_threshold, min_tap_gap_ms)
+    requested_bpm = float(bpm)
+    if timing_mode == "Fit 2 bars to detected taps":
+        bpm = estimate_bpm_from_taps(tap_samples, sr, requested_bpm)
     input_hvo, info = taps_to_model_input(tap_samples, tap_strengths, sr, bpm)
     input_tensor = torch.tensor(input_hvo[None], dtype=torch.float32, device=device)
 
@@ -319,9 +357,11 @@ def process_audio(
     output_hvo_np = output_hvo.detach().cpu().numpy()
     detected_taps_audio = render_hvo_audio(input_hvo, bpm=bpm, sr=sr, one_voice_name="closed_hat")
     generated_audio = render_hvo_audio(output_hvo_np, bpm=bpm, sr=sr)
-    mixed_audio = mix_audio(original_audio, generated_audio)
+    aligned_taps_audio = align_audio_to_recording(detected_taps_audio, len(original_audio), info["start_time_sec"], sr)
+    aligned_generated_audio = align_audio_to_recording(generated_audio, len(original_audio), info["start_time_sec"], sr)
+    mixed_audio = mix_audio(original_audio, aligned_generated_audio)
 
-    taps_path = write_wav(output_root / "detected_taps.wav", detected_taps_audio, sr)
+    taps_path = write_wav(output_root / "detected_taps.wav", aligned_taps_audio, sr)
     output_path = write_wav(output_root / "groove_transformer_output.wav", generated_audio, sr)
     mix_path = write_wav(output_root / "recording_plus_output.wav", mixed_audio, sr)
 
@@ -333,6 +373,8 @@ def process_audio(
     status = (
         f"Done. Detected taps: {int(info['detected_taps'])} | "
         f"Used in 2-bar window: {int(input_hvo[:, 0].sum())} | "
+        f"BPM: {float(bpm):.1f} | "
+        f"Window start: {float(info['start_time_sec']):.3f}s | "
         f"Input shape: {tuple(input_tensor.shape)} | "
         f"Output shape: {tuple(output_hvo_np.shape)} | "
         f"Latent shape: {tuple(latent_z.shape)} | "
@@ -354,6 +396,11 @@ def build_app(default_model_path: Path, default_output_dir: Path) -> gr.Blocks:
                 model_path = gr.Textbox(label="Model checkpoint", value=str(default_model_path))
                 output_dir = gr.Textbox(label="Output directory", value=str(default_output_dir))
                 bpm = gr.Slider(minimum=60, maximum=200, value=DEFAULT_BPM, step=1, label="BPM")
+                timing_mode = gr.Radio(
+                    choices=TIMING_MODES,
+                    value=TIMING_MODES[0],
+                    label="Timing mode",
+                )
                 tap_threshold = gr.Slider(
                     minimum=0.01,
                     maximum=0.95,
@@ -384,7 +431,16 @@ def build_app(default_model_path: Path, default_output_dir: Path) -> gr.Blocks:
 
         run_button.click(
             fn=process_audio,
-            inputs=[audio, model_path, bpm, tap_threshold, min_tap_gap_ms, output_threshold, output_dir],
+            inputs=[
+                audio,
+                model_path,
+                bpm,
+                timing_mode,
+                tap_threshold,
+                min_tap_gap_ms,
+                output_threshold,
+                output_dir,
+            ],
             outputs=[tap_audio, drum_audio, mix_audio_output, status],
         )
     return demo

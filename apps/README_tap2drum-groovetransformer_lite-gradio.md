@@ -10,6 +10,14 @@ The app:
 - runs `BaseVAE.predict(...)`,
 - renders the detected taps and generated 9-voice drum output as WAV files.
 
+## Timing
+
+The model input is one 2-bar window: 32 sixteenth-note steps. At 120 BPM, that musical window is 4 seconds, plus a short audio tail for rendered drum decay.
+
+Use **BPM** when you know the tap tempo. Use **Fit 2 bars to detected taps** when the recording is intended to be exactly one 2-bar phrase and you want the app to infer a BPM from the detected tap span.
+
+Longer recordings are currently reduced to one 2-bar model window. The mixed output aligns that window back to the original recording at the detected tap-window start time.
+
 ## Setup
 
 Install the app dependencies in the same environment you use for the model:
